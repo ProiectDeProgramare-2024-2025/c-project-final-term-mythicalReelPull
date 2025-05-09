@@ -85,9 +85,19 @@ void customizePizza(const char *filename) {
     int choice;
     do {
         clearScreen();
-        printf(COLOR_YELLOW "\n""==== Customize Your Pizza ====\n" COLOR_RESET);
+        printf(COLOR_YELLOW "\n==== Customize Your Pizza ====\n" COLOR_RESET);
         for (int i = 0; i < toppingCount; i++) {
-            printf("%d. " COLOR_CYAN "%s\n" COLOR_RESET, i + 1, toppings[i]);
+            char *d = strchr(toppings[i], '$');
+            if (d) {
+                int len = d - toppings[i];
+                printf("%d. %.*s" COLOR_GREEN "$" COLOR_RESET "%s \n",
+                       i+1,
+                       len,                // print text before '$'
+                       toppings[i],
+                       d+1);              // print price after '$'
+            } else {
+                printf("%d. " COLOR_CYAN "%s" COLOR_RESET "\n", i+1, toppings[i]);
+            }
         }
         printf("--------------------------");
         printf("\n%d. Back to Restaurant Menu\n", toppingCount + 1);
@@ -129,30 +139,44 @@ void customizePizza(const char *filename) {
     } while (choice != toppingCount + 1);
 }
 
-void saveOrder(DeliveryInfo info) { //saves info to csv file
+void saveOrder(DeliveryInfo info) {
     FILE *file = fopen("order_history.csv", "a");
     if (file == NULL) {
-        printf(COLOR_RED"Error opening file: %p \n" COLOR_RESET, file);
+        printf(COLOR_RED "Error opening file: %p\n" COLOR_RESET, file);
         return;
     }
-    //write customer info
+
+    // Write customer info
     fprintf(file, "\"%s\",\"%s\",\"%s\",\"", info.name, info.address, info.phone);
 
-    //write all ordered items
+    double totalOrder = 0;
+
+    // Write all ordered items with their total price
     for (int i = 0; i < orderCount; i++) {
-        fprintf(file, "%s from %s (x%d)",
-                orders[i].item,
-                orders[i].restaurant,
-                orders[i].quantity);
-        if (i < orderCount - 1) {
-            fprintf(file, "; ");
+        const char *dollarSign = strchr(orders[i].item, '$');
+        if (dollarSign) {
+            int price = atoi(dollarSign + 1);
+            double totalItem = price * orders[i].quantity;
+            totalOrder += totalItem;
+
+            fprintf(file, "%s from %s (x%d) - $%.2f",
+                    orders[i].item,
+                    orders[i].restaurant,
+                    orders[i].quantity,
+                    totalItem);
+
+            if (i < orderCount - 1) {
+                fprintf(file, "; ");
+            }
         }
     }
-    fprintf(file, "\"\n");
+
+    // Write total order price
+    fprintf(file, "\",\"$%.2f\"\n", totalOrder);
     fclose(file);
 }
 
-void processOrder() { //reads info to register user
+void processOrder() { //saves order to file
     DeliveryInfo info;
     clearScreen();
     printf(COLOR_YELLOW "==== Order Placement ====\n" COLOR_RESET);
@@ -170,13 +194,16 @@ void processOrder() { //reads info to register user
     fgets(info.phone, sizeof(info.phone), stdin);
     info.phone[strcspn(info.phone, "\n")] = 0;
 
+    // Save the order to the file
     saveOrder(info);
-    printf(COLOR_GREEN"\nOrder placed successfully!\n" COLOR_RESET);
 
-    // Clear current orders after saving
-    //orderCount = 0;
+    printf(COLOR_GREEN "\nOrder placed successfully!\n" COLOR_RESET);
 
-    printf("Press anything to continue...");
+    // Clear the current orders
+    orderCount = 0;
+    memset(orders, 0, sizeof(orders)); // Reset the orders array
+
+    printf("Press anything to return to the main menu...");
     getchar();
 }
 
@@ -199,16 +226,22 @@ void placeOrder(const char *restaurantName, const char *filename) { //remembers 
     do {
 
         for (int i = 0; i < itemCount; i++) {
-            char *dollarSign = strchr(menuItems[i], '$'); // Find the dollar sign in the string
-            if (dollarSign) {
-                *dollarSign = '\0'; // Temporarily terminate the string before the dollar sign
-                printf("%d. %s" COLOR_GREEN "$" COLOR_RESET "%s\n", i + 1, menuItems[i], dollarSign + 1);
+            char *d = strchr(menuItems[i], '$');
+            if (d) {
+                int len = d - menuItems[i];
+                printf("%d. %.*s" COLOR_GREEN "$" COLOR_RESET "%s\n",
+                       i+1,
+                       len,                // print text before '$'
+                       menuItems[i],
+                       d+1);              // print the price
             } else {
-                printf("%d. %s\n", i + 1, menuItems[i]); // If no dollar sign, print normally
+                printf("%d. %s\n", i+1, menuItems[i]);
             }
         }
+
+
         printf("--------------------------\n");
-        printf("%d.Back to Restaurant Menu\n", itemCount + 1);
+        printf("%d. Back to Restaurant Menu\n", itemCount + 1);
         printf("\nEnter item number to order or exit: ");
         scanf("%d", &choice);
 
@@ -217,16 +250,25 @@ void placeOrder(const char *restaurantName, const char *filename) { //remembers 
             int found = 0;
             //check if item is already in list
             for (int i = 0; i < orderCount; i++) {
-               if (strcmp(orders[i].item, menuItems[choice-1]) == 0 && strcmp(orders[i].restaurant, restaurantName) == 0) {
-                   orders[i].quantity ++;
-                   found = 1;
-                   printf("Increased quantity of " COLOR_GREEN "%s" COLOR_RESET " to " COLOR_BLUE"%d"COLOR_RESET"\n",
-                    orders[i].item,
-                    orders[i].quantity);
-                   printf("\n");
-                   getchar();
-                   break;
-               }
+                if (strcmp(orders[i].item, menuItems[choice-1]) == 0 && strcmp(orders[i].restaurant, restaurantName) == 0) {
+                    orders[i].quantity++;
+                    found = 1;
+                    char itemName[256];
+                    char price[32];
+                    strcpy(itemName, orders[i].item);
+                    char *dollarPos = strchr(itemName, '$');
+                    if (dollarPos) {
+                        *dollarPos = '\0';
+                        printf("\t Increased quantity of %s" COLOR_GREEN "$" COLOR_RESET "%s to " COLOR_BLUE "%d" COLOR_RESET "\n",
+                               itemName, dollarPos + 1, orders[i].quantity);
+                    } else {
+                        printf("\t Increased quantity of %s to " COLOR_BLUE "%d" COLOR_RESET "\n",
+                               orders[i].item, orders[i].quantity);
+                    }
+                    printf("\n");
+                    getchar();
+                    break;
+                }
             }
             if (!found) {
                 if (orderCount < MAX_ORDERS) {
@@ -234,16 +276,23 @@ void placeOrder(const char *restaurantName, const char *filename) { //remembers 
                     strcpy(orders[orderCount].restaurant, restaurantName);
                     orders[orderCount].quantity = 1;
                     orderCount++;
-                    printf("Item added to order successfully!!!\n");
-                    //printf(orders[orderCount].item);
+
+                    char itemName[256];
+                    strcpy(itemName, menuItems[choice-1]);
+                    char *dollarPos = strchr(itemName, '$');
+                    if (dollarPos) {
+                        *dollarPos = '\0';
+                        printf("Added %s" COLOR_GREEN "$" COLOR_RESET "%s to order successfully!\n",
+                               itemName, dollarPos + 1);
+                    } else {
+                        printf("\n Item added to order successfully!!!\n");
+                    }
+                    printf("\t Press anything to continue\n");
                     printf("\n");
-                    printf("Press anything to continue\n");
                     getchar();
-
-                }else{
-                    printf(COLOR_RED"Item not found\n" COLOR_RESET);
+                } else {
+                    printf(COLOR_RED "Item not found\n" COLOR_RESET);
                 }
-
             }
         }
 
@@ -317,10 +366,10 @@ void previousOrders() {
                     *multiplier = '\0';
                     if (restaurant) {
                         *restaurant = '\0';
-                        printf("%s - " COLOR_GREEN "$%d" COLOR_RESET " (unit) - " COLOR_GREEN "$%.2f" COLOR_RESET " (total) from %s (x%d); ",
-                               item, price, itemTotal, restaurant + 5, quantity);
+                        printf("%s " COLOR_GREEN "$%d" COLOR_RESET " PER UNIT ==> PRICE FOR x%d UNIT/S = " COLOR_GREEN "$%.2f" COLOR_RESET" FROM %s; ",
+                               item, price, quantity, itemTotal, restaurant + 5);
                     } else {
-                        printf("%s - " COLOR_GREEN "$%d" COLOR_RESET " (unit) - " COLOR_GREEN "$%.2f" COLOR_RESET " (total) (x%d); ",
+                        printf("%s " COLOR_GREEN "$%d" COLOR_RESET " PER UNIT ==> " COLOR_GREEN "$%.2f" COLOR_RESET " (x%d); ",
                                item, price, itemTotal, quantity);
                     }
                 }
@@ -362,10 +411,24 @@ void viewOrderHistory(){
                     printf(COLOR_RED"No current order!" COLOR_RESET);
                 } else {
                     for (int i = 0; i < orderCount; i++) {
-                        printf(COLOR_CYAN"%s" COLOR_RESET " from " COLOR_MAGENTA"%s" COLOR_RESET ", x" COLOR_GREEN"%d\n" COLOR_RESET,
-                               orders[i].item,
-                               orders[i].restaurant,
-                               orders[i].quantity);
+                        char itemName[256];
+                        strcpy(itemName, orders[i].item);
+                        char *dollarPos = strchr(itemName, '$');
+                        if (dollarPos) {
+                            *dollarPos = '\0';
+                            printf("%s" COLOR_GREEN "$" "%s" COLOR_RESET " from "
+                                   COLOR_MAGENTA "%s" COLOR_RESET ", x" COLOR_GREEN "%d" COLOR_RESET "\n",
+                                   itemName,
+                                   dollarPos + 1,
+                                   orders[i].restaurant,
+                                   orders[i].quantity);
+                        } else {
+                            printf(COLOR_CYAN "%s" COLOR_RESET " from " COLOR_MAGENTA "%s" COLOR_RESET ", x"
+                                   COLOR_GREEN "%d" COLOR_RESET "\n",
+                                   orders[i].item,
+                                   orders[i].restaurant,
+                                   orders[i].quantity);
+                        }
                     }
                     printf("\nWant to place this order? (1=" COLOR_GREEN "yes" COLOR_RESET " / 2=" COLOR_RED "no" COLOR_RESET ") : \n");
                     int placeChoice;
@@ -390,10 +453,10 @@ void viewOrderHistory(){
 
             case 3:
                 clearScreen();
-                printf("Returning to main menu..\n");
+                printf("Returning to Main Menu..\n");
                 break;
             default:
-                printf(COLOR_RED "Invalid choice\n" COLOR_RESET);
+                printf(COLOR_RED "Invalid Choice\n" COLOR_RESET);
                 printf("Press anything to continue..");
                 getchar();
         }
