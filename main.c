@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define COLOR_RESET "\033[0m"
 #define COLOR_GREEN "\033[32m"
@@ -181,18 +182,46 @@ void processOrder() { //saves order to file
     clearScreen();
     printf(COLOR_YELLOW "==== Order Placement ====\n" COLOR_RESET);
 
-    printf(COLOR_CYAN "Enter your name " COLOR_RESET "(example: " COLOR_GREEN "anto" COLOR_RESET "): ");
-    getchar();
-    fgets(info.name, sizeof(info.name), stdin);
-    info.name[strcspn(info.name, "\n")] = 0;
+    do {
+        printf(COLOR_CYAN "Enter your name " COLOR_RESET "(example: " COLOR_GREEN "anto" COLOR_RESET "): ");
+        getchar();
+        fgets(info.name, sizeof(info.name), stdin);
+        info.name[strcspn(info.name, "\n")] = 0;
 
-    printf(COLOR_CYAN "Enter delivery address " COLOR_RESET "(example: " COLOR_GREEN "street 1" COLOR_RESET "): ");
-    fgets(info.address, sizeof(info.address), stdin);
-    info.address[strcspn(info.address, "\n")] = 0;
+        if (strlen(info.name) == 0) {
+            printf(COLOR_RED "Name cannot be empty! Please try again.\n" COLOR_RESET);
+        }
+    } while (strlen(info.name) == 0);
 
-    printf(COLOR_CYAN "Enter phone number " COLOR_RESET "(example: " COLOR_GREEN "zzz-zzz-zzz" COLOR_RESET "): ");
-    fgets(info.phone, sizeof(info.phone), stdin);
-    info.phone[strcspn(info.phone, "\n")] = 0;
+    printf(COLOR_CYAN "Enter street name/number " COLOR_RESET "(example: " COLOR_GREEN "Mihai Eminescu" COLOR_RESET "): ");
+    char temp[250];
+    fgets(temp, sizeof(temp), stdin);
+    temp[strcspn(temp, "\n")] = 0;
+    snprintf(info.address, sizeof(info.address), "street %s", temp);
+
+    do {
+        printf(COLOR_CYAN "Enter phone number " COLOR_RESET "(9 digits only): ");
+        fgets(info.phone, sizeof(info.phone), stdin);
+        info.phone[strcspn(info.phone, "\n")] = 0;
+
+        int valid = 1;
+        if (strlen(info.phone) != 9) {
+            valid = 0;
+        } else {
+            for (int i = 0; info.phone[i] != '\0'; i++) {
+                if (!isdigit(info.phone[i])) {
+                    valid = 0;
+                    break;
+                }
+            }
+        }
+
+        if (!valid) {
+            printf(COLOR_RED "Invalid input! Please enter exactly 9 digits.\n" COLOR_RESET);
+        } else {
+            break;
+        }
+    } while (1);
 
     // Save the order to the file
     saveOrder(info);
@@ -472,7 +501,8 @@ void menuRestaurant(const char *restaurantName, const char *filename) {
         printf(COLOR_YELLOW"==== Menu of: %s ==== \n" COLOR_RESET, restaurantName);
         printf("1. View Menu items\n");
         printf("2. Order from this Restaurant\n");
-        if (strcmp(restaurantName, "Restaurant 1") == 0) { //added an optional view for choosing to customize a pizza
+        if (strcmp(restaurantName, "Flavor Foundry3"
+                                   "") == 0) { //added an optional view for choosing to customize a pizza
             printf("3. Customize a Pizza\n");
             printf("4. Back to Main Menu\n");
         }else {
@@ -499,7 +529,7 @@ void menuRestaurant(const char *restaurantName, const char *filename) {
                 placeOrder(restaurantName, filename);
                 break;
             case 3:
-                if(strcmp(restaurantName, "Restaurant 1") == 0) {
+                if(strcmp(restaurantName, "Flavor Foundry") == 0) {
                     clearScreen();
                     printf(COLOR_YELLOW"==== Customize a Pizza ====\n" COLOR_RESET);
                     customizePizza("pizza_toppings.txt");
@@ -509,7 +539,7 @@ void menuRestaurant(const char *restaurantName, const char *filename) {
                 }
                 break;
             case 4:
-                if (strcmp(restaurantName, "Restaurant 1") == 0) {
+                if (strcmp(restaurantName, "Flavor Foundry") == 0) {
                     clearScreen();
                     printf("\nReturning to Main Menu...\n");
                 } else {
@@ -523,8 +553,8 @@ void menuRestaurant(const char *restaurantName, const char *filename) {
                 printf(COLOR_RED "Invalid choice. Try Again\n" COLOR_RESET);
                 getchar();
         }
-    } while ((strcmp(restaurantName, "Restaurant 1") == 0 && choice != 4) ||
-         (strcmp(restaurantName, "Restaurant 1") != 0 && choice != 3));
+    } while ((strcmp(restaurantName, "Flavor Foundry") == 0 && choice != 4) ||
+         (strcmp(restaurantName, "Flavor Foundry") != 0 && choice != 3));
 }
 
 int main(void) {
@@ -542,15 +572,16 @@ int main(void) {
         printf("Enter your choice(1 trough 5): ");
         scanf("%d", &choice);
         switch (choice) {
-            case 1: menuRestaurant("Restaurant 1", "restaurant1.txt");
+            case 1: menuRestaurant("Flavor Foundry", "restaurant1.txt");
                 break;
-            case 2: menuRestaurant("Restaurant 2", "restaurant2.txt");
+            case 2: menuRestaurant("Bistro Byte1"
+                                   "", "restaurant2.txt");
                 break;
-            case 3: menuRestaurant("Restaurant 3", "restaurant3.txt");
+            case 3: menuRestaurant("Taco Tango", "restaurant3.txt");
                 break;
             case 4: viewOrderHistory();
                 break;
-            default:printf("Exiting... Bye!:)\n");
+            default:printf(COLOR_GREEN"Exiting... Bye!:)"COLOR_RESET"\n");
             getchar();
         }
     }while (choice != 5);
